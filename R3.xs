@@ -379,7 +379,7 @@ void r3_edge_branch(edge *e, int dl) {
     int s1_len = 0;
 
     edge **tmp_edges = e->child->edges;
-    int   tmp_r3_edge_len = e->child->edge_len;
+    int   tmp_edge_len = e->child->edge_len;
 
     // the suffix edge of the leaf
     c1 = r3_tree_create(3);
@@ -388,7 +388,7 @@ void r3_edge_branch(edge *e, int dl) {
     // printf("edge left: %s\n", e1->pattern);
 
     // Migrate the child edges to the new edge we just created.
-    for ( int i = 0 ; i < tmp_r3_edge_len ; i++ ) {
+    for ( int i = 0 ; i < tmp_edge_len ; i++ ) {
         r3_node_append_edge(c1, tmp_edges[i]);
         e->child->edges[i] = NULL;
     }
@@ -399,6 +399,8 @@ void r3_edge_branch(edge *e, int dl) {
 
     r3_node_append_edge(e->child, e1);
     c1->endpoint++;
+    c1->data = e->child->data; // copy data pointer
+    e->child->data = NULL;
 }
 
 void r3_edge_free(edge * e) {
@@ -1053,7 +1055,12 @@ void r3_tree_dump(node * n, int level) {
             printf(" regexp:%s", n->combined_pattern);
         }
 
-        printf(" endpoint:%d\n", n->endpoint);
+        printf(" endpoint:%d", n->endpoint);
+
+        if (n->data) {
+            printf(" data:%p", n->data);
+        }
+        printf("\n");
 
         for ( int i = 0 ; i < n->edge_len ; i++ ) {
             edge * e = n->edges[i];
@@ -1065,7 +1072,7 @@ void r3_tree_dump(node * n, int level) {
                 printf("%s", compile_slug(e->pattern, e->pattern_len) );
             }
 
-            if ( e->child && e->child->edges ) {
+            if ( e->child ) {
                 r3_tree_dump( e->child, level + 1);
             }
             printf("\n");
