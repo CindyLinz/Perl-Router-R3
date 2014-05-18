@@ -7,7 +7,7 @@
 
 #include "const-c.inc"
 
-//#define PERL_R3_DEBUG
+#define PERL_R3_DEBUG
 
 /* __R3_SOURCE_SLOT_BEGIN__ */
 /******* ../include/r3_define.h *******/
@@ -110,13 +110,19 @@ str_array * split_route_pattern(char *pattern, int pattern_len);
 
 struct _edge;
 struct _node;
+struct _route;
 typedef struct _edge edge;
 typedef struct _node node;
+typedef struct _route route;
 
 struct _node {
-    edge ** edges;
+    edge  ** edges;
     int      edge_len;
     int      edge_cap;
+
+    route ** routes;
+    int      route_len;
+    int      route_cap;
 
 
     /** compile-time variables here.... **/
@@ -130,9 +136,9 @@ struct _node {
     int *  ov;
 
     /**
-     * the pointer of route structure
+     * the pointer of route data
      */
-    void * route_ptr;
+    void * data;
 
     int endpoint;
 };
@@ -146,10 +152,33 @@ struct _edge {
 
 typedef struct {
     str_array * vars;
-    char * path; // dispatched path
-    int    path_len;
-    void * route_ptr; // route ptr
+    char * path; // current path to dispatch
+    int    path_len; // the length of the current path
+    int    request_method;  // current request method
+
+    void * data; // route ptr
+
+    char * host; // the request host 
+    int    host_len;
+
+    char * remote_addr;
+    int    remote_addr_len;
 } match_entry;
+
+struct _route {
+    char * path;
+    int    path_len;
+
+    int    request_method; // can be (GET || POST)
+
+    char * host; // required host name
+    int    host_len;
+
+    void * data;
+
+    char * remote_addr_pattern;
+    int    remote_addr_pattern_len;
+};
 
 
 node * r3_tree_create(int cap);
@@ -160,17 +189,21 @@ void r3_tree_free(node * tree);
 
 void r3_edge_free(edge * edge);
 
-edge * r3_tree_add_child(node * n, char * pat , node *child);
+edge * r3_node_add_child(node * n, char * pat , node *child);
 
 edge * r3_node_find_edge(node * n, char * pat);
 
-void r3_tree_append_edge(node *n, edge *child);
+void r3_node_append_edge(node *n, edge *child);
 
-node * r3_tree_insert_path(node *tree, char *route, void * route_ptr);
+node * r3_tree_insert_path(node *tree, char *path, route * route, void * data);
 
-node * r3_tree_insert_pathn(node *tree, char *route, int route_len, void * route_ptr);
+node * r3_tree_insert_pathl(node *tree, char *path, int path_len, route * route, void * data);
 
 void r3_tree_dump(node * n, int level);
+
+int r3_tree_render_file(node * tree, char * format, char * filename);
+
+int r3_tree_render_dot(node * tree);
 
 edge * r3_node_find_edge_str(node * n, char * str, int str_len);
 
@@ -181,9 +214,9 @@ void r3_tree_compile_patterns(node * n);
 
 node * r3_tree_match(node * n, char * path, int path_len, match_entry * entry);
 
-bool r3_node_has_slug_edges(node *n);
+node * r3_tree_match_with_entry(node * n, match_entry * entry);
 
-node * r3_tree_lookup(node * tree, char * path, int path_len);
+bool r3_node_has_slug_edges(node *n);
 
 edge * r3_edge_create(char * pattern, int pattern_len, node * child);
 
@@ -192,10 +225,31 @@ void r3_edge_branch(edge *e, int dl);
 void r3_edge_free(edge * edge);
 
 
+node * r3_tree_insert_route(node *tree, route * route, void * data);
 
-match_entry * match_entry_create(char * path, int path_len);
+match_entry * match_entry_createl(char * path, int path_len);
+
+#define match_entry_create(path) match_entry_createl(path,strlen(path))
 
 void match_entry_free(match_entry * entry);
+
+
+route * route_create(char * path);
+
+route * route_createl(char * path, int path_len);
+
+int route_cmp(route *r1, match_entry *r2);
+
+void r3_node_append_route(node * n, route * route);
+
+void route_free(route * route);
+
+route * r3_node_match_route(node *n, match_entry * entry);
+
+#define METHOD_GET 2
+#define METHOD_POST 2<<1
+#define METHOD_PUT 2<<1
+#define METHOD_DELETE 2<<1
 
 #endif /* !NODE_H */
 /******* ../include/r3_list.h *******/
@@ -304,6 +358,14 @@ char *my_strndup(const char *s, int n);
 /* #include "r3.h" */
 /* #include "str_array.h" */
 
+edge * r3_edge_create(char * pattern, int pattern_len, node * child) {
+    edge * e = (edge*) malloc( sizeof(edge) );
+    e->pattern = pattern;
+    e->pattern_len = pattern_len;
+    e->child = child;
+    return e;
+}
+
 
 
 /**
@@ -327,7 +389,7 @@ void r3_edge_branch(edge *e, int dl) {
 
     // Migrate the child edges to the new edge we just created.
     for ( int i = 0 ; i < tmp_r3_edge_len ; i++ ) {
-        r3_tree_append_edge(c1, tmp_edges[i]);
+        r3_node_append_edge(c1, tmp_edges[i]);
         e->child->edges[i] = NULL;
     }
     e->child->edge_len = 0;
@@ -335,17 +397,8 @@ void r3_edge_branch(edge *e, int dl) {
 
     info("branched pattern: %s\n", e1->pattern);
 
-    r3_tree_append_edge(e->child, e1);
+    r3_node_append_edge(e->child, e1);
     c1->endpoint++;
-}
-
-
-edge * r3_edge_create(char * pattern, int pattern_len, node * child) {
-    edge * e = (edge*) malloc( sizeof(edge) );
-    e->pattern = pattern;
-    e->pattern_len = pattern_len;
-    e->child = child;
-    return e;
 }
 
 void r3_edge_free(edge * e) {
@@ -552,7 +605,7 @@ void r3_tree_free(node * tree) {
 
 
 /* parent node, edge pattern, child */
-edge * r3_tree_add_child(node * n, char * pat , node *child) {
+edge * r3_node_add_child(node * n, char * pat , node *child) {
     // find the same sub-pattern, if it does not exist, create one
 
     edge * e;
@@ -563,7 +616,7 @@ edge * r3_tree_add_child(node * n, char * pat , node *child) {
     }
 
     e = r3_edge_create( pat, strlen(pat), child);
-    r3_tree_append_edge(n, e);
+    r3_node_append_edge(n, e);
     // str_array_append(n->edge_patterns, pat);
     // assert( str_array_len(n->edge_patterns) == n->edge_len );
     return e;
@@ -571,8 +624,7 @@ edge * r3_tree_add_child(node * n, char * pat , node *child) {
 
 
 
-void r3_tree_append_edge(node *n, edge *e) {
-
+void r3_node_append_edge(node *n, edge *e) {
     if (!n->edges) {
         n->edge_cap = 3;
         n->edges = malloc(sizeof(edge) * n->edge_cap);
@@ -658,7 +710,7 @@ void r3_tree_compile_patterns(node * n) {
 
     const char *error;
     int erroffset;
-    unsigned int option_bits;
+    unsigned int option_bits = 0;
 
     if (n->pcre_pattern)
         free(n->pcre_pattern);
@@ -668,7 +720,7 @@ void r3_tree_compile_patterns(node * n) {
     // n->pcre_pattern;
     n->pcre_pattern = pcre_compile(
             n->combined_pattern,              /* the pattern */
-            0,                                /* default options */
+            option_bits,                                /* default options */
             &error,               /* for error message */
             &erroffset,           /* for error offset */
             NULL);                /* use default character tables */
@@ -684,20 +736,25 @@ void r3_tree_compile_patterns(node * n) {
 }
 
 
-match_entry * match_entry_create(char * path, int path_len) {
+match_entry * match_entry_createl(char * path, int path_len) {
     match_entry * entry = malloc(sizeof(match_entry));
     if(!entry)
         return NULL;
     entry->vars = str_array_create(3);
     entry->path = path;
     entry->path_len = path_len;
-    entry->route_ptr = NULL;
+    entry->data = NULL;
     return entry;
 }
 
 void match_entry_free(match_entry * entry) {
     str_array_free(entry->vars);
     free(entry);
+}
+
+
+node * r3_tree_match_with_entry(node * n, match_entry * entry) {
+    return r3_tree_match(n, entry->path, entry->path_len, entry);
 }
 
 
@@ -785,43 +842,48 @@ node * r3_tree_match(node * n, char * path, int path_len, match_entry * entry) {
     return NULL;
 }
 
+route * r3_node_match_route(node *n, match_entry * entry) {
+    if (n->routes && n->route_len > 0) {
+        int i;
+        for (i = 0; i < n->route_len ; i++ ) {
+            if ( route_cmp(n->routes[i], entry) == 0 ) {
+                return n->routes[i];
+            }
+        }
+    }
+    return NULL;
+}
 
 inline edge * r3_node_find_edge_str(node * n, char * str, int str_len) {
     int i = 0;
+    int matched_idx = 0;
+
     for (; i < n->edge_len ; i++ ) {
-        info("matching '%s' with '%s'\n", str, node_edge_pattern(n,i) );
-        if ( strncmp( node_edge_pattern(n,i), str, node_edge_pattern_len(n,i) ) == 0 ) {
-            return n->edges[i];
+        if ( *str == *(n->edges[i]->pattern) ) {
+            matched_idx = i;
+            break;
         }
+    }
+
+        // info("matching '%s' with '%s'\n", str, node_edge_pattern(n,i) );
+    if ( strncmp( node_edge_pattern(n,matched_idx), str, node_edge_pattern_len(n,matched_idx) ) == 0 ) {
+        return n->edges[matched_idx];
     }
     return NULL;
 }
 
 
-node * r3_tree_lookup(node * tree, char * path, int path_len) {
-    str_array * tokens = split_route_pattern(path, path_len);
-
-    node * n = tree;
-    edge * e = NULL;
-    int i = 0;
-    for (; i < tokens->len ; i++ ) {
-        e = r3_node_find_edge(n, str_array_fetch(tokens, i) );
-        if (!e) {
-            return NULL;
-        }
-        n = e->child;
-    }
-    if (n->endpoint) {
-        return n;
-    }
-    return NULL;
-}
 
 node * r3_node_create() {
     node * n = (node*) malloc( sizeof(node) );
     n->edges = NULL;
     n->edge_len = 0;
     n->edge_cap = 0;
+
+    n->routes = NULL;
+    n->route_len = 0;
+    n->route_cap = 0;
+
     n->endpoint = 0;
     n->combined_pattern = NULL;
     n->pcre_pattern = NULL;
@@ -829,67 +891,106 @@ node * r3_node_create() {
 }
 
 
-node * r3_tree_insert_path(node *tree, char *route, void * route_ptr)
-{
-    return r3_tree_insert_pathn(tree, route, strlen(route) , route_ptr);
+route * route_create(char * path) {
+    return route_createl(path, strlen(path));
 }
 
-node * r3_tree_insert_pathn(node *tree, char *route, int route_len, void * route_ptr)
+void route_free(route * route) {
+    free(route);
+}
+
+route * route_createl(char * path, int path_len) {
+    route * info = malloc(sizeof(route));
+    info->path = path;
+    info->path_len = path_len;
+    info->request_method = 0; // can be (GET || POST)
+
+    info->data = NULL;
+
+    info->host = NULL; // required host name
+    info->host_len = 0;
+
+    info->remote_addr_pattern = NULL;
+    info->remote_addr_pattern_len = 0;
+    return info;
+}
+
+node * r3_tree_insert_route(node *tree, route * route, void * data) {
+    return r3_tree_insert_pathl(tree, route->path, route->path_len, route, data);
+}
+
+node * r3_tree_insert_path(node *tree, char *path, route * route, void * data)
+{
+    return r3_tree_insert_pathl(tree, path, strlen(path) , route , data);
+}
+
+
+/**
+ * Return the last inserted node.
+ */
+node * r3_tree_insert_pathl(node *tree, char *path, int path_len, route * route, void * data)
 {
     node * n = tree;
     edge * e = NULL;
 
-    char * p = route;
-
     /* length of common prefix */
-    int dl = 0;
+    int offset = 0;
     for( int i = 0 ; i < n->edge_len ; i++ ) {
-        dl = strndiff(route, n->edges[i]->pattern, n->edges[i]->pattern_len);
+        offset = strndiff(path, n->edges[i]->pattern, n->edges[i]->pattern_len);
 
-        // printf("dl: %d   %s vs %s\n", dl, route, n->edges[i]->pattern );
+        // printf("offset: %d   %s vs %s\n", offset, path, n->edges[i]->pattern );
 
         // no common, consider insert a new edge
-        if ( dl > 0 ) {
+        if ( offset > 0 ) {
             e = n->edges[i];
             break;
         }
     }
 
     // branch the edge at correct position (avoid broken slugs)
-    char *slug_s = strchr(route, '{');
-    char *slug_e = strchr(route, '}');
+    char *slug_s = strchr(path, '{');
+    char *slug_e = strchr(path, '}');
     if ( slug_s && slug_e ) {
-        if ( dl > (slug_s - route) && dl < (slug_e - route) ) {
+        if ( offset > (slug_s - path) && offset < (slug_e - path) ) {
             // break before '{'
-            dl = slug_s - route;
+            offset = slug_s - path;
         }
     }
 
-    if ( dl == 0 ) {
+    if ( offset == 0 ) {
         // not found, we should just insert a whole new edge
         node * child = r3_tree_create(3);
-        r3_tree_add_child(n, my_strndup(route, route_len) , child);
-        info("edge not found, insert one: %s\n", route);
-        child->route_ptr = route_ptr;
+        r3_node_add_child(n, my_strndup(path, path_len) , child);
+        info("edge not found, insert one: %s\n", path);
+        child->data = data;
         child->endpoint++;
-        return child;
-    } else if ( dl == e->pattern_len ) {    // fully-equal to the pattern of the edge
 
-        char * subroute = route + dl;
-        int    subroute_len = route_len - dl;
+        if (route) {
+            route->data = data;
+            r3_node_append_route(child, route);
+        }
+        return child;
+    } else if ( offset == e->pattern_len ) {    // fully-equal to the pattern of the edge
+
+        char * subpath = path + offset;
+        int    subpath_len = path_len - offset;
 
         // there are something more we can insert
-        if ( subroute_len > 0 ) {
-            return r3_tree_insert_pathn(e->child, subroute, subroute_len, route_ptr);
+        if ( subpath_len > 0 ) {
+            return r3_tree_insert_pathl(e->child, subpath, subpath_len, route, data);
         } else {
-            // no more,
-            e->child->endpoint++; // make it as an endpoint, TODO: put the route value
-            e->child->route_ptr = route_ptr;
+            // no more path to insert
+            e->child->endpoint++; // make it as an endpoint
+            e->child->data = data;
+            if (route) {
+                route->data = data;
+                r3_node_append_route(e->child, route);
+            }
             return e->child;
         }
 
-    } else if ( dl < e->pattern_len ) {
-        // printf("branch the edge dl: %d\n", dl);
+    } else if ( offset < e->pattern_len ) {
+        // printf("branch the edge offset: %d\n", offset);
 
 
         /* it's partially matched with the pattern,
@@ -897,28 +998,36 @@ node * r3_tree_insert_pathn(node *tree, char *route, int route_len, void * route
          */
         node *c2; // child 1, child 2
         edge *e2; // edge 1, edge 2
-        char * s2 = route + dl;
+        char * s2 = path + offset;
         int s2_len = 0;
 
-        r3_edge_branch(e, dl);
+        r3_edge_branch(e, offset);
 
         // here is the new edge from.
         c2 = r3_tree_create(3);
-        s2_len = route_len - dl;
+        s2_len = path_len - offset;
         e2 = r3_edge_create(my_strndup(s2, s2_len), s2_len, c2);
         // printf("edge right: %s\n", e2->pattern);
-        r3_tree_append_edge(e->child, e2);
+        r3_node_append_edge(e->child, e2);
 
+
+        char *op = e->pattern;
         // truncate the original edge pattern 
-        // e->pattern = my_strndup(e->pattern, dl);
-        e->pattern_len = dl;
+        e->pattern = my_strndup(e->pattern, offset);
+        e->pattern_len = offset;
+        free(op);
 
         // move n->edges to c1
         c2->endpoint++;
-        c2->route_ptr = route_ptr;
+        c2->data = data;
+
+        if (route) {
+            route->data = data;
+            r3_node_append_route(c2, route);
+        }
         return c2;
     } else {
-        printf("unexpected condition.");
+        printf("unexpected route.");
         return NULL;
     }
     return n;
@@ -964,11 +1073,62 @@ void r3_tree_dump(node * n, int level) {
     }
 }
 
-/*
-char * r3_node_trace(node * n) {
 
+/**
+ * return 0 == equal
+ *
+ * -1 == different route
+ */
+int route_cmp(route *r1, match_entry *r2) {
+    if (r1->request_method != 0) {
+        if (0 == (r1->request_method & r2->request_method) ) {
+            return -1;
+        }
+    }
+
+    if ( r1->path && r2->path ) {
+        if ( strcmp(r1->path, r2->path) != 0 ) {
+            return -1;
+        }
+    }
+
+    if ( r1->host && r2->host ) {
+        if (strcmp(r1->host, r2->host) != 0 ) {
+            return -1;
+        }
+    }
+
+    if (r1->remote_addr_pattern) {
+        /*
+         * XXX: consider "netinet/in.h"
+        if (r2->remote_addr) {
+            inet_addr(r2->remote_addr);
+        }
+        */
+        if ( strcmp(r1->remote_addr_pattern, r2->remote_addr) != 0 ) {
+            return -1;
+        }
+    }
+    return 0;
 }
-*/
+
+
+/**
+ * 
+ */
+void r3_node_append_route(node * n, route * route) {
+    if (!n->routes) {
+        n->route_cap = 3;
+        n->routes = malloc(sizeof(route) * n->route_cap);
+    }
+    if (n->route_len >= n->route_cap) {
+        n->route_cap *= 2;
+        n->routes = realloc(n->routes, sizeof(route) * n->route_cap);
+    }
+    n->routes[ n->route_len++ ] = route;
+}
+
+
 /******* ../src/str.c *******/
 /*
  * str.c
@@ -1026,7 +1186,7 @@ bool contains_slug(char * str) {
  */
 char * compile_slug(char * str, int len)
 {
-    char *s1 = NULL, *s2 = NULL, *i = NULL, *o = NULL;
+    char *s1 = NULL, *s2 = NULL, *o = NULL;
     char *pat = NULL;
     char sep = '/';
 
@@ -1055,8 +1215,22 @@ char * compile_slug(char * str, int len)
     if ( NULL != (pat = strchr(s1, ':')) ) {
         pat++;
 
+        // find closing '}'
+        int cnt = 1;
+        s2 = pat;
+        while(s2) {
+            if (*s2 == '{' )
+                cnt++;
+            else if (*s2 == '}' )
+                cnt--;
+
+            if (cnt == 0)
+                break;
+            s2++;
+        }
+
         // this slug contains a pattern
-        s2 = strchr(pat, '}');
+        // s2 = strchr(pat, '}');
 
         *o = '(';
         o++;
@@ -1248,58 +1422,6 @@ void str_array_dump(str_array *l) {
 
 
 
-/**
- * This function is used to split route path into a string array, not for performance.
- * hence this function should be safe.
- *
- * Split "/path/foo/{id}" into [ "/path" , "/foo" , "/{id}" ]
- * Split "/path/bar/{id}" into [ "/path" , "/foo" , "/{id}" ]
- * Split "/blog/post/{id}" into [ "/blog" , "/post" , "/{id}" ]
- * Split "/blog/{id}" into [ "/blog" , "/{id}" ]
- * Split "/blog" into [ "/blog" ]
- * Split "/b" into [ "/b" ]
- * Split "/{id}" into [ "/{id}" ]
- *
- * @param char* pattern
- * @param int   pattern_len
- *
- * @return char**
- */
-str_array * split_route_pattern(char *pattern, int pattern_len) {
-    char *s1, *p = pattern;
-
-    str_array * str_array = str_array_create( 20 );
-
-    s1 = p;
-    p++;
-    while (*p && (p - pattern) < pattern_len ) {
-
-        // a slug
-        if ( *p == '{' ) {
-            // find closing '}'
-            while (*p != '}') {
-                p++;
-                assert(p - pattern < pattern_len ); // throw exception
-            }
-            p++; // contains the '}'
-            // printf("==> %s\n", my_strndup(s1, p-s1) );
-            str_array_append(str_array, my_strndup(s1, p-s1) );
-            s1 = p;
-            continue;
-        }
-        else if ( *p == '/' ) {
-            // printf("==> %s\n", my_strndup(s1, p-s1) );
-            str_array_append(str_array, my_strndup(s1, p-s1) );
-            s1 = p;
-        }
-        p++;
-    }
-
-    if ( p-s1 > 0 ) {
-        str_array_append(str_array, my_strndup(s1, p-s1) );
-    }
-    return str_array;
-}
 /* __R3_SOURCE_SLOT_END__ */
 
 static int pad_free(pTHX_ SV *sv, MAGIC *mg){
@@ -1328,26 +1450,26 @@ void _test(){
     match_entry * entry;
 
     // insert the route path into the router tree
-    r3_tree_insert_pathn(n , "/zoo"       , strlen("/zoo")       , &route_data );
-    r3_tree_insert_pathn(n , "/foo/bar"   , strlen("/foo/bar")   , &route_data );
-    r3_tree_insert_pathn(n , "/bar"       , strlen("/bar")       , &route_data );
-    r3_tree_insert_pathn(n , "/post/{id}" , strlen("/post/{id}") , &route_data );
-    // r3_tree_insert_pathn(n , "abc"       , strlen("abc")       , &route_data );
-    // r3_tree_insert_pathn(n , "ade"       , strlen("ade")       , &route_data );
-    // r3_tree_insert_pathn(n , "/f/foo"       , strlen("/f/foo")       , &route_data );
-    // r3_tree_insert_pathn(n , "/f/bar"       , strlen("/f/bar")       , &route_data );
+    r3_tree_insert_pathl(n , "/zoo"       , strlen("/zoo")       , NULL,  &route_data );
+    r3_tree_insert_pathl(n , "/foo/bar"   , strlen("/foo/bar")   , NULL,  &route_data );
+    r3_tree_insert_pathl(n , "/bar"       , strlen("/bar")       , NULL,  &route_data );
+    r3_tree_insert_pathl(n , "/post/{id}" , strlen("/post/{id}") , NULL,  &route_data );
+    // r3_tree_insert_pathl(n , "abc"       , strlen("abc")       , NULL,  &route_data );
+    // r3_tree_insert_pathl(n , "ade"       , strlen("ade")       , NULL,  &route_data );
+    // r3_tree_insert_pathl(n , "/f/foo"       , strlen("/f/foo")       , NULL,  &route_data );
+    // r3_tree_insert_pathl(n , "/f/bar"       , strlen("/f/bar")       , NULL,  &route_data );
 
     r3_tree_compile(n);
 
 
     r3_tree_dump(n, 0);
 
-    entry = match_entry_create( "/zoo" , strlen("/zoo") );
+    entry = match_entry_createl( "/zoo" , strlen("/zoo") );
     matched_node = r3_tree_match(n, "/zoo", strlen("/zoo"), entry );
     printf("matched_node=%p\n", (void*)matched_node);
     if( matched_node ){
-        printf("route_ptr=%p - %p\n", (void*)matched_node->route_ptr, (void*)&route_data);
-        ret = *( (int*) matched_node->route_ptr );
+        printf("data=%p - %p\n", (void*)matched_node->data, (void*)&route_data);
+        ret = *( (int*) matched_node->data );
         printf("ret=%d\n", ret);
     }
     match_entry_free(entry);
@@ -1452,7 +1574,7 @@ INCLUDE: const-xs.inc
     capture_n[i] = this_capture_n; \
     if( i < branch_n - 1 ) \
         first_capture_key_head[i+1] = this_capture_key_head_cursor; \
-    r3_tree_insert_pathn(r3, pattern, pattern_len, &target[i]); \
+    r3_tree_insert_pathl(r3, pattern, pattern_len, NULL, &target[i]); \
 }
 
 #ifdef PERL_R3_DEBUG
@@ -1605,11 +1727,11 @@ match(SV* r3_sv, SV *str_sv)
         STRLEN str_len;
         str = SvPVbyte(str_sv, str_len);
 
-        match_entry* entry = match_entry_create(str, str_len);
+        match_entry* entry = match_entry_createl(str, str_len);
         node* matched_node = r3_tree_match(r3, str, str_len, entry);
 
         if( matched_node ){
-            SV** target_p = (SV**) matched_node->route_ptr;
+            SV** target_p = (SV**) matched_node->data;
 #ifdef PERL_R3_DEBUG
             printf("matched target_p = %p\n", (void*)target_p);
             printf("matched target = %p\n", (void*)(*(SV**)target_p));
