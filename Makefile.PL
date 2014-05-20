@@ -9,7 +9,7 @@ WriteMakefile(
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Router/R3.pm', # retrieve abstract from module
        AUTHOR         => 'Cindy Wang (CindyLinz) <cindy@>') : ()),
-    LIBS              => ['-lpcre', '-ljemalloc'], # e.g., '-lm'
+    LIBS              => ['-lpcre'], # e.g., '-lm'
     DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
     INC               => '-I.', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
