@@ -1,16 +1,11 @@
-Router-R3 version 0.01
+Router-R3 version 0.9.0
 ======================
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+    This mod is a XS wrapper around a C library R3.
 
-A README file is required for CPAN modules since CPAN extracts the
-README file from a module distribution so that people browsing the
-archive can use it get an idea of the modules uses. It is usually a
-good idea to provide version information here so that people can
-decide whether fixes for the module are worth downloading.
+    R3 is an URL router library with high performance, thus, it's implemented in C. It compiles your route paths into a prefix trie.
+
+    By using the constructed prefix trie in the start-up time, you can dispatch routes with efficiency.
 
 INSTALLATION
 
@@ -21,11 +16,13 @@ To install this module type the following:
    make test
    make install
 
-DEPENDENCIES
+SEE ALSO
 
-This module requires these other modules and libraries:
+The original C version L<"github repository"|https://github.com/c9s/r3> by L<c9s|https://metacpan.org/author/CORNELIUS>
 
-  blah blah blah
+This mod's L<"github repository"|https://github.com/CindyLinz/Perl-Router-R3>
+All the source files with this mod are in the Router-R3 directory.
+
 
 COPYRIGHT AND LICENCE
 
@@ -34,7 +31,7 @@ Put the correct copyright and licence information here.
 Copyright (C) 2014 by Cindy Wang (CindyLinz)
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.18.2 or,
+it under the same terms as Perl itself, either Perl version 5.8 or,
 at your option, any later version of Perl 5 you may have available.
 
 

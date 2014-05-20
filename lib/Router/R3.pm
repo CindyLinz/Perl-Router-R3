@@ -1,6 +1,6 @@
 package Router::R3;
 
-use 5.018002;
+use 5.006;
 use strict;
 use warnings;
 use Carp;
@@ -8,26 +8,8 @@ use Carp;
 require Exporter;
 use AutoLoader;
 
-our @ISA = qw(Exporter);
-
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Router::R3 ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-	
-) ] );
-
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw(
-	
-);
-
-our $VERSION = '0.01';
+use version;
+our $VERSION = qv '0.9.0';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -39,16 +21,6 @@ sub AUTOLOAD {
     croak "&Router::R3::constant not defined" if $constname eq 'constant';
     my ($error, $val) = constant($constname);
     if ($error) { croak $error; }
-    {
-	no strict 'refs';
-	# Fixed between 5.005_53 and 5.005_61
-#XXX	if ($] >= 5.00561) {
-#XXX	    *$AUTOLOAD = sub () { $val };
-#XXX	}
-#XXX	else {
-	    *$AUTOLOAD = sub { $val };
-#XXX	}
-    }
     goto &$AUTOLOAD;
 }
 
@@ -65,48 +37,78 @@ __END__
 
 =head1 NAME
 
-Router::R3 - Perl extension for blah blah blah
+Router::R3 - URL router library with high performance
 
 =head1 SYNOPSIS
 
   use Router::R3;
-  blah blah blah
+
+  my $router = Router::R3->new(
+    '/static/index.html' => 1,
+    '/post/{id}' => 2,
+    '/post_comment/{id:\d+}/{id2}' => 3,
+  );
+
+  my($match, $captures);
+  ($match, $captures) = $router->match('/static/index.html'); # (1, {})
+  ($match, $captures) = $router->match('/post/123'); # (2, { id => '123' })
+  ($match, $captures) = $router->match('/post_comment/123/456'); # (3, { id => '123', id2 => '456' })
+  ($match, $captures) = $router->match('/post_comment/xxx/456'); # ()  no match
+
+  # or you can pass a hashref or an arrayref when Router::R3->new
+
+  my $router = Router::R3->new(['/static', 1, '/post/{id}', 2]);
+  my $router = Router::R3->new({'/static' => 1, '/post/{id}' => 2});
+
+  # The latter one of each rule could be any perl scalar
+  #  It'll be given to you when the rule is matched.
+  #  It's better not to put anything which is treated as false here.
 
 =head1 DESCRIPTION
 
-Stub documentation for Router::R3, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
+This mod is a XS wrapper around a C library R3.
 
-Blah blah blah.
+R3 is an URL router library with high performance, thus, it's implemented in C. It compiles your route paths into a prefix trie.
 
-=head2 EXPORT
+By using the constructed prefix trie in the start-up time, you can dispatch routes with efficiency.
 
-None by default.
+=head2 PATTERN SYNTAX
 
+  /blog/post/{id}        use [^/]+ regular expression by default.
+  /blog/post/{id:\d+}    use `\d+` regular expression instead of default.
+  /blog/post/{id:\d{2}}  use `\d{2}` regular expression instead of default.
 
+=head2 METHODS
+
+=over 4
+
+=item $router = Router::R3->new(...)
+
+    The constructor
+
+=item ($matched, \%captures) = $router->match($test_string)
+
+    Match strings
+
+=back
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
+The original C version L<"github repository"|https://github.com/c9s/r3> by L<c9s|https://metacpan.org/author/CORNELIUS>
 
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
+This mod's L<"github repository"|https://github.com/CindyLinz/Perl-Router-R3>
+All the source files with this mod are in the Router-R3 directory.
 
 =head1 AUTHOR
 
-Cindy Wang (CindyLinz), E<lt>cindy@E<gt>
+Cindy Wang (CindyLinz)
 
 =head1 COPYRIGHT AND LICENSE
 
 Copyright (C) 2014 by Cindy Wang (CindyLinz)
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.18.2 or,
+it under the same terms as Perl itself, either Perl version 5.8 or,
 at your option, any later version of Perl 5 you may have available.
 
 
