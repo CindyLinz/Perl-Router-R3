@@ -358,7 +358,7 @@ char *my_strndup(const char *s, int n);
 #include <assert.h>
 
 // Jemalloc memory management
-#include <jemalloc/jemalloc.h>
+// #include <jemalloc/jemalloc.h>
 
 // PCRE
 #include <pcre.h>
@@ -575,7 +575,7 @@ list_each_element(l, func)
 #include <assert.h>
 
 // Jemalloc memory management
-#include <jemalloc/jemalloc.h>
+// #include <jemalloc/jemalloc.h>
 
 // PCRE
 #include <pcre.h>
@@ -597,9 +597,14 @@ list_each_element(l, func)
 node * r3_tree_create(int cap) {
     node * n = (node*) malloc( sizeof(node) );
 
-    n->edges = (edge**) malloc( sizeof(edge*) * 10 );
+    n->edges = (edge**) malloc( sizeof(edge*) * cap );
     n->edge_len = 0;
     n->edge_cap = cap;
+
+    n->routes = NULL;
+    n->route_len = 0;
+    n->route_cap = 0;
+
     n->endpoint = 0;
     n->combined_pattern = NULL;
     n->pcre_pattern = NULL;
@@ -615,7 +620,10 @@ void r3_tree_free(node * tree) {
             r3_edge_free(tree->edges[ i ]);
         }
     }
-
+    if (tree->edges)
+        free(tree->edges);
+    if (tree->routes)
+        free(tree->routes);
     if (tree->combined_pattern)
         free(tree->combined_pattern);
     if (tree->pcre_pattern)
@@ -624,8 +632,6 @@ void r3_tree_free(node * tree) {
         free(tree->pcre_extra);
     if (tree->ov) 
         free(tree->ov);
-    free(tree->edges);
-    // str_array_free(tree->edge_patterns);
     free(tree);
     tree = NULL;
 }
@@ -653,13 +659,16 @@ edge * r3_node_add_child(node * n, char * pat , node *child) {
 
 
 void r3_node_append_edge(node *n, edge *e) {
-    if (!n->edges) {
+    if (n->edges == NULL) {
         n->edge_cap = 3;
         n->edges = malloc(sizeof(edge) * n->edge_cap);
     }
     if (n->edge_len >= n->edge_cap) {
         n->edge_cap *= 2;
-        n->edges = realloc(n->edges, sizeof(edge) * n->edge_cap);
+        edge ** p = realloc(n->edges, sizeof(edge) * n->edge_cap);
+        if(p) {
+            n->edges = p;
+        }
     }
     n->edges[ n->edge_len++ ] = e;
 }
@@ -1140,8 +1149,8 @@ int r3_route_cmp(route *r1, match_entry *r2) {
 /**
  * 
  */
-void r3_node_append_route(node * n, route * route) {
-    if (!n->routes) {
+void r3_node_append_route(node * n, route * r) {
+    if (n->routes == NULL) {
         n->route_cap = 3;
         n->routes = malloc(sizeof(route) * n->route_cap);
     }
@@ -1149,7 +1158,7 @@ void r3_node_append_route(node * n, route * route) {
         n->route_cap *= 2;
         n->routes = realloc(n->routes, sizeof(route) * n->route_cap);
     }
-    n->routes[ n->route_len++ ] = route;
+    n->routes[ n->route_len++ ] = r;
 }
 
 
