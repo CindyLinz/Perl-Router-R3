@@ -8,7 +8,7 @@ use Data::Dumper;
 use Router::R3;
 
 #Router::R3::test();
-my $t = Router::R3::new_r3(
+my $t = Router::R3->new(
     '/foo/bar' => 2,
     '/zoo' => 1,
     '/bar' => 3,
@@ -17,7 +17,7 @@ my $t = Router::R3::new_r3(
     '/post3/{idx:\d{3}}' => 6,
     '/post4/{idx:\d{3}}/{idy}' => 7,
 );
-my($a, $b) = Router::R3::match($t, '/post/XX-OO');
+my($a, $b) = $t->match('/post4/333/22');
 print "t=$t, a=$a, b=$b\n";
 if( $b ) {
     local $Data::Dumper::Indent = 0;
@@ -28,6 +28,6 @@ __END__
 
 output:
 
-t=REF(0xf30740), a=4, b=HASH(0xf307d0)
-$VAR1 = {'id' => 'XX-OO'};
+t=Router::R3=REF(0x23c27b8), a=7, b=HASH(0x23c27a0)
+$VAR1 = {'idy' => '22','idx' => '333'};
 

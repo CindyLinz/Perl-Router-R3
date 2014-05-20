@@ -7,7 +7,7 @@
 
 #include "const-c.inc"
 
-#define PERL_R3_DEBUG
+//#define PERL_R3_DEBUG
 
 /* __R3_SOURCE_SLOT_BEGIN__ */
 /******* ../include/r3_define.h *******/
@@ -1520,23 +1520,6 @@ void str_array_dump(str_array *l) {
 
 /* __R3_SOURCE_SLOT_END__ */
 
-static int pad_free(pTHX_ SV *sv, MAGIC *mg){
-    void* pad = SvRV(sv);
-    int branch_n = *(int*)((char*)pad + sizeof(node*));
-    SV** target = (SV**)((char*)pad + sizeof(node*) + sizeof(int));
-    for(int i=0; i<branch_n; ++i)
-        SvREFCNT_dec(target[i]);
-    r3_tree_free(*(node**)pad);
-    Safefree(pad);
-    SvRV(sv) = 0;
-    return 0;
-}
-
-static MGVTBL r3_pad_vtbl = {
-    0, 0, 0, 0,
-    pad_free
-};
-
 #ifdef PERL_R3_DEBUG
 void _test(){
     int route_data = 3;
@@ -1714,16 +1697,18 @@ INCLUDE: const-xs.inc
 #define DUMP_PAD(pad) ;
 #endif
 
-SV *
-new_r3(...)
-    CODE:
+void
+new(...)
+    PPCODE:
         {
             void *r3_pad;
             int branch_n = 0;
             int capture_n_total = 0;
             int capture_key_len_total = 0;
-            if( items == 1 && SvROK(ST(0)) ) {
-                SV *rv = SvRV(ST(0));
+            if( items == 0 )
+                croak("Router::R3::new without classname?");
+            if( items == 2 && SvROK(ST(1)) ) {
+                SV *rv = SvRV(ST(1));
                 switch( SvTYPE(rv) ) {
                     case SVt_PVAV: { // [pattern, target, pattern, target, ...]
                         break;
@@ -1732,15 +1717,15 @@ new_r3(...)
                         break;
                     }
                     default:
-                        warn("new_r3 with invalid reference");
+                        warn("Router::R3::new with invalid reference");
                 }
-            } else if( items > 1 ) { // pattern, target, pattern, target, ...
-                branch_n = items + 1 >> 1;
-                if( items & 1 )
-                    warn("new_r3 with odd arguments");
-                for(I32 i=0; i<items; i+=2) {
+            } else if( items > 2 ) { // pattern, target, pattern, target, ...
+                branch_n = items >> 1;
+                if( !(items & 1) )
+                    warn("Router::R3::new with odd arguments");
+                for(I32 i=1; i<items; i+=2) {
                     if( !SvPOK(ST(i)) )
-                        warn("The %dth argument for new_r3 call should be a string", i+1);
+                        warn("The %dth argument for new call should be a string", i);
                     ANALYZE_PATTERN(ST(i));
                 }
             }
@@ -1764,15 +1749,15 @@ new_r3(...)
             {
                 node* r3;
                 ASSIGN_OFFSET;
-                if( items + 1 >> 1 <= 10 )
-                    r3 = r3_tree_create( items + 1 >> 1 );
+                if( items >> 1 <= 10 )
+                    r3 = r3_tree_create( items >> 1 );
                 else
                     r3 = r3_tree_create(10);
                 *(node**)r3_pad = r3;
                 BRANCH_N = branch_n;
 
-                if( items == 1 && SvROK(ST(0)) ) {
-                    SV *rv = SvRV(ST(0));
+                if( items == 2 && SvROK(ST(1)) ) {
+                    SV *rv = SvRV(ST(1));
                     switch( SvTYPE(rv) ) {
                         case SVt_PVAV: { // [pattern, target, pattern, target, ...]
                             break;
@@ -1781,11 +1766,11 @@ new_r3(...)
                             break;
                         }
                         default:
-                            warn("new_r3 with invalid reference");
+                            warn("Router::R3::new with invalid reference");
                     }
-                } else if( items > 1 ) { // pattern, target, pattern, target, ...
+                } else if( items > 2 ) { // pattern, target, pattern, target, ...
                     I32 i;
-                    for(i=0; i<items; i+=2) {
+                    for(i=1; i<items; i+=2) {
                         I32 i2 = i >> 1;
                         SV *val = i+1 < items ? ST(i+1) : NULL;
                         FILL_PATTERN(r3, i2, ST(i), val);
@@ -1796,26 +1781,22 @@ new_r3(...)
             }
 
             SV* ret = newSV(0);
-            SvUPGRADE(ret, SVt_PVMG);
-            sv_magicext(ret, 0, PERL_MAGIC_ext, &r3_pad_vtbl, 0, 0);
+            SvUPGRADE(ret, SVt_RV);
             SvROK_on(ret);
             SvRV(ret) = (SV*)r3_pad;
-            RETVAL = newRV_noinc(ret);
+
+            SV * obj = newRV_noinc(ret);
+            STRLEN classname_len;
+            char * classname = SvPVbyte(ST(0), classname_len);
+            HV * stash = gv_stashpvn(classname, classname_len, 0);
+            sv_bless(obj, stash);
+            EXTEND(SP, 1);
+            PUSHs(sv_2mortal(obj));
         }
-    OUTPUT:
-        RETVAL
 
 void
 match(SV* r3_sv, SV *str_sv)
     PPCODE:
-        MAGIC* mg;
-        if(
-            !SvROK(r3_sv) ||
-            !(mg = mg_find(SvRV(r3_sv), PERL_MAGIC_ext)) ||
-            mg->mg_virtual != &r3_pad_vtbl
-        )
-            croak("Router::R3::match called on a non-R3 object");
-
         void* r3_pad = SvRV(SvRV(r3_sv));
         node* r3 = *(node**)r3_pad;
 
@@ -1862,6 +1843,17 @@ match(SV* r3_sv, SV *str_sv)
             PUSHs(sv_2mortal(newRV_noinc((SV*)captures_hv)));
         }
         match_entry_free(entry);
+
+void DESTROY(SV* r3_sv)
+    PPCODE:
+        void* pad = SvRV(SvRV(r3_sv));
+        int branch_n = *(int*)((char*)pad + sizeof(node*));
+        SV** target = (SV**)((char*)pad + sizeof(node*) + sizeof(int));
+        for(int i=0; i<branch_n; ++i)
+            SvREFCNT_dec(target[i]);
+        r3_tree_free(*(node**)pad);
+        Safefree(pad);
+        SvRV(SvRV(r3_sv)) = 0;
 
 #ifdef PERL_R3_DEBUG
 
