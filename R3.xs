@@ -1581,12 +1581,9 @@ MODULE = Router::R3		PACKAGE = Router::R3
 
 INCLUDE: const-xs.inc
 
-#define ANALYZE_PATTERN(pSV) { \
-    char *pattern; \
-    STRLEN pattern_len, j; \
+#define ANALYZE_PATTERN(pattern, pattern_len) { \
     int k; \
-    pattern = SvPVbyte(pSV, pattern_len); \
-    for(j=0; j<pattern_len; ++j) \
+    for(STRLEN j=0; j<pattern_len; ++j) \
         if( pattern[j] == '{' ){ \
             ++capture_n_total; \
             ++j; \
@@ -1609,12 +1606,10 @@ INCLUDE: const-xs.inc
         } \
 }
 
-#define FILL_PATTERN(r3, i, key, val) { \
+#define FILL_PATTERN(r3, i, pattern, pattern_len, val) { \
     int this_capture_n = 0; \
     char** this_capture_key_head_cursor; \
     char* this_capture_key_pool_cursor; \
-    char *pattern; \
-    STRLEN pattern_len; \
     if( val ) \
         target[i] = newSVsv(val); \
     else \
@@ -1626,7 +1621,6 @@ INCLUDE: const-xs.inc
     else \
         this_capture_key_pool_cursor = *(first_capture_key_head[i]-1); \
     this_capture_key_head_cursor = first_capture_key_head[i]; \
-    pattern = SvPVbyte(key, pattern_len); \
     for(STRLEN j=0; j<pattern_len; ++j) \
         if( pattern[j] == '{' ){ \
             ++this_capture_n; \
@@ -1711,9 +1705,37 @@ new(...)
                 SV *rv = SvRV(ST(1));
                 switch( SvTYPE(rv) ) {
                     case SVt_PVAV: { // [pattern, target, pattern, target, ...]
+                        AV *av = (AV*)rv;
+                        SSize_t len = av_len(av);
+                        if( !(len & 1) )
+                            warn("Router::R3::new with odd length array");
+                        branch_n = len + 1 >> 1;
+                        for(SSize_t i=0; i<=len; i+=2){
+                            SV** key = av_fetch(av, i, 0);
+                            if( !key || !SvPOK(*key) )
+                                warn("The %dth element of the new call argument array should be a string", i);
+                            STRLEN pattern_len;
+                            char * pattern;
+                            if( key )
+                                pattern = SvPVbyte(*key, pattern_len);
+                            else {
+                                pattern = "";
+                                pattern_len = 0;
+                            }
+                            ANALYZE_PATTERN(pattern, pattern_len);
+                        }
                         break;
                     }
                     case SVt_PVHV: { // {pattern => target, pattern => target, ...}
+                        HV *hv = (HV*)rv;
+                        branch_n = hv_iterinit(hv);
+                        char *pattern;
+                        I32 pattern_len;
+                        HE *he;
+                        while( he = hv_iternext(hv) ){
+                            pattern = hv_iterkey(he, &pattern_len);
+                            ANALYZE_PATTERN(pattern, pattern_len);
+                        }
                         break;
                     }
                     default:
@@ -1724,9 +1746,12 @@ new(...)
                 if( !(items & 1) )
                     warn("Router::R3::new with odd arguments");
                 for(I32 i=1; i<items; i+=2) {
-                    if( !SvPOK(ST(i)) )
+                    SV * key = ST(i);
+                    if( !SvPOK(key) )
                         warn("The %dth argument for new call should be a string", i);
-                    ANALYZE_PATTERN(ST(i));
+                    STRLEN pattern_len;
+                    char * pattern = SvPVbyte(key, pattern_len);
+                    ANALYZE_PATTERN(pattern, pattern_len);
                 }
             }
 #ifdef PERL_R3_DEBUG
@@ -1760,9 +1785,35 @@ new(...)
                     SV *rv = SvRV(ST(1));
                     switch( SvTYPE(rv) ) {
                         case SVt_PVAV: { // [pattern, target, pattern, target, ...]
+                            AV *av = (AV*)rv;
+                            SSize_t len = av_len(av);
+                            for(SSize_t i=0; i<=len; i+=2){
+                                I32 i2 = i >> 1;
+                                SV ** pval = i+1 <= len ? av_fetch(av, i+1, 0) : NULL;
+                                char * pattern;
+                                STRLEN pattern_len;
+                                SV ** pkey = av_fetch(av, i, 0);
+                                if( pkey )
+                                    pattern = SvPVbyte(*pkey, pattern_len);
+                                else{
+                                    pattern = "";
+                                    pattern_len = 0;
+                                }
+                                FILL_PATTERN(r3, i2, pattern, pattern_len, (pval ? *pval : NULL));
+                            }
                             break;
                         }
                         case SVt_PVHV: { // {pattern => target, pattern => target, ...}
+                            HV *hv = (HV*)rv;
+                            hv_iterinit(hv);
+                            char *pattern;
+                            I32 pattern_len;
+                            SV *val;
+                            I32 i2 = 0;
+                            while( val = hv_iternextsv(hv, &pattern, &pattern_len) ){
+                                FILL_PATTERN(r3, i2, pattern, pattern_len, val);
+                                ++i2;
+                            }
                             break;
                         }
                         default:
@@ -1773,10 +1824,12 @@ new(...)
                     for(i=1; i<items; i+=2) {
                         I32 i2 = i >> 1;
                         SV *val = i+1 < items ? ST(i+1) : NULL;
-                        FILL_PATTERN(r3, i2, ST(i), val);
+                        STRLEN pattern_len;
+                        char * pattern = SvPVbyte(ST(i), pattern_len);
+                        FILL_PATTERN(r3, i2, pattern, pattern_len, val);
                     }
-                    DUMP_PAD(r3_pad);
                 }
+                DUMP_PAD(r3_pad);
                 r3_tree_compile(r3);
             }
 
