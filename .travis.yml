@@ -1,0 +1,10 @@
+perl:
+  - "5.18"
+  - "5.12"
+install:
+  - apt-get install libpcre3 libpcre3-dev libjemalloc-dev libjemalloc1 build-essential libtool pkg-config
+before_script:
+  - git submodule update --init
+  - perl Makefile.PL
+script:
+  - make
