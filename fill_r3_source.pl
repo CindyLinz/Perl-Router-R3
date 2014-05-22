@@ -23,16 +23,16 @@ my $xs_code = read_file('R3.xs');
 
 my $source_code = '';
 for(qw(
-    ../include/r3_define.h
-    ../include/str_array.h
-    ../include/r3.h
-    ../include/r3_list.h
-    ../include/r3_str.h
-    ../src/edge.c
-    ../src/list.c
-    ../src/node.c
-    ../src/str.c
-    ../src/token.c
+    r3/include/r3_define.h
+    r3/include/str_array.h
+    r3/include/r3.h
+    r3/include/r3_list.h
+    r3/include/r3_str.h
+    r3/src/edge.c
+    r3/src/list.c
+    r3/src/node.c
+    r3/src/str.c
+    r3/src/token.c
 )) {
     $source_code .= "/******* $_ *******/\n";
     $source_code .= read_file($_);
