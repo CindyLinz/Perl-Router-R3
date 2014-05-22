@@ -1,9 +1,22 @@
 use 5.006;
 use ExtUtils::MakeMaker;
+use ExtUtils::PkgConfig;
 
-@INCLUDE_DIRS=qw(.);
+my @INCLUDE_DIRS=qw(.);
 push @INCLUDE_DIRS, "/usr/local/include" if -e "/usr/local/include"; # check for homebrew path
 push @INCLUDE_DIRS, "/opt/local/include" if -e "/opt/local/include"; # check for macports path
+
+my @CCFLAGS = qw(-O2 -std=c99);
+my @LIBS = qw();
+
+my %pkg_info = ExtUtils::PkgConfig->find('libpcre');
+die "libpcre is required." unless %pkg_info;
+print "Found libpcre:\n";
+print "modversion:  $pkg_info{modversion}\n";
+print "cflags:      $pkg_info{cflags}\n";
+print "libs:        $pkg_info{libs}\n";
+
+push @LIBS, $pkg_info{libs};
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
@@ -14,12 +27,12 @@ WriteMakefile(
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Router/R3.pm', # retrieve abstract from module
        AUTHOR         => 'Cindy Wang (CindyLinz) <cindy@cpan.org>') : ()),
-    LIBS              => ['-lpcre'], # e.g., '-lm'
+    LIBS              => \@LIBS,
     DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
-    INC               => join ' ', map { "-I$_" } @INCLUDE_DIRS,
-	# Un-comment this if you add C files to link with later:
+    INC               => join(' ', map { "-I$_" } @INCLUDE_DIRS),
+    # Un-comment this if you add C files to link with later:
     # OBJECT            => '$(O_FILES)', # link all the C files too
-    CCFLAGS           => '-O2 -std=c99',
+    CCFLAGS           => join(' ', @CCFLAGS),
 );
 if  (eval {require ExtUtils::Constant; 1}) {
   # If you edit these definitions to change the constants used by this module,
