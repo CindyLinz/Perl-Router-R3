@@ -10,7 +10,6 @@ WriteMakefile(
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Router/R3.pm', # retrieve abstract from module
        AUTHOR         => 'Cindy Wang (CindyLinz) <cindy@cpan.org>') : ()),
-    DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
     CONFIGURE_REQUIRES => { 
         'ExtUtils::PkgConfig' => 0,
         'ExtUtils::MakeMaker' => 0,
@@ -32,6 +31,7 @@ WriteMakefile(
         push @INCLUDE_DIRS, "/opt/local/include" if -e "/opt/local/include"; # check for macports path
 
         return {
+            DEFINE            => '', # e.g., '-DHAVE_SOMETHING'
             LIBS    => \@LIBS,
             CCFLAGS => join(' ',@CCFLAGS),
             INC     => join(' ', map { "-I$_" } @INCLUDE_DIRS),
