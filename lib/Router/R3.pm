@@ -9,7 +9,7 @@ require Exporter;
 use AutoLoader;
 
 use version;
-our $VERSION = qv '0.9.2';
+our $VERSION = qv '0.9.3';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
