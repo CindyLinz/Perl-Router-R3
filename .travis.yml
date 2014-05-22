@@ -8,3 +8,4 @@ before_script:
   - perl Makefile.PL
 script:
   - make
+  - make test
