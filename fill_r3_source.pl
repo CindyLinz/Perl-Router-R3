@@ -22,15 +22,21 @@ sub write_file {
 my $xs_code = read_file('R3.xs');
 
 my $source_code = '';
+$source_code =<<'END';
+#define HAVE_STRNDUP
+#define HAVE_STRDUP
+END
 for(qw(
     r3/include/r3_define.h
     r3/include/str_array.h
     r3/include/r3.h
     r3/include/r3_list.h
     r3/include/r3_str.h
+    r3/include/zmalloc.h
     r3/src/edge.c
     r3/src/list.c
     r3/src/node.c
+    r3/src/zmalloc.c
     r3/src/str.c
     r3/src/token.c
 )) {
@@ -39,7 +45,7 @@ for(qw(
 }
 
 $source_code =~ s!(#include\s+".*)!/* $1 */!g;
-$source_code =~ s!\b(strn?dup)\b!my_$1!g;
+# $source_code =~ s!\b(strn?dup)\b!my_$1!g;
 
 $xs_code =~ s!(__R3_SOURCE_SLOT_BEGIN__.*?\n)(.*?)([^\n]*?__R3_SOURCE_SLOT_END__)!$1$source_code$3!s;
 
