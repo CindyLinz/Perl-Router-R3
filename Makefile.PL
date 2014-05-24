@@ -1,5 +1,34 @@
 use 5.006;
 use ExtUtils::MakeMaker;
+use strict;
+use warnings;
+
+our %build_reqs = (
+    # 'perl-ExtUtils-Depends'   => '0.300',
+    'perl-ExtUtils-PkgConfig' => '1.030',
+);
+
+our %PREREQ_PM = (
+    # 'ExtUtils::Depends'   => $build_reqs{'perl-ExtUtils-Depends'},
+    'ExtUtils::PkgConfig' => $build_reqs{'perl-ExtUtils-PkgConfig'},
+);
+
+sub try_module  {
+    my ($name, $required_version) = @_;
+    return eval "use $name '$required_version'; 1;";
+}
+
+# Writing a fake Makefile ensures that CPAN will pick up the correct
+# dependencies and install them.
+unless (eval "use ExtUtils::PkgConfig '$build_reqs{'perl-ExtUtils-PkgConfig'}'; 1") {
+    warn "$@\n";
+    WriteMakefile(
+        PREREQ_PM    => \%PREREQ_PM,
+        PRINT_PREREQ => 1,
+    );
+    exit 1; # not reached
+}
+
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
@@ -15,7 +44,6 @@ WriteMakefile(
         'ExtUtils::MakeMaker' => 0,
     },
     CONFIGURE => sub {
-        use ExtUtils::PkgConfig;
         my @CCFLAGS = qw(-O2 -std=c99);
         my @LIBS = qw();
         my %pkg_info = ExtUtils::PkgConfig->find('libpcre');

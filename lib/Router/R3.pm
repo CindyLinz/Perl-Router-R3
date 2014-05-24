@@ -78,6 +78,18 @@ By using the constructed prefix trie in the start-up time, you can dispatch rout
   /blog/post/{id:\d+}    use `\d+` regular expression instead of default.
   /blog/post/{id:\d{2}}  use `\d{2}` regular expression instead of default.
 
+=head1 INSTALLATION
+
+Install from CPAN:
+
+    $ cpanm Router::R3
+
+Or from GitHub:
+
+    $ git clone https://github.com/CindyLinz/Perl-Router-R3.git
+    $ cd Perl-Router-R3
+    $ cpanm -v --installdeps .
+
 =head2 METHODS
 
 =over 4
