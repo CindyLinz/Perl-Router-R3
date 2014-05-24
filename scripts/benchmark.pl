@@ -100,4 +100,33 @@ foreach my $b (@Benchmarks) {
 }
 
 
+1;
+__END__
 
+Benchmark Result
+
+https://gist.github.com/c9s/488d6fd4e53c34758559
+
+Benchmarking 'plain string matching' by path '/corge/quux/bar'
+===============================================================
+                   Rate  HTTP::Router Router::Simple  Router::Boom    Router::R3
+HTTP::Router      505/s            --           -88%         -100%         -100%
+Router::Simple   4225/s          738%             --          -98%         -100%
+Router::Boom   177535/s        35090%          4102%            --          -80%
+Router::R3     877196/s       173773%         20660%          394%            --
+ 
+Benchmarking 'regexp string matching' by path '/post/2012/03'
+===============================================================
+                   Rate  HTTP::Router Router::Simple  Router::Boom    Router::R3
+HTTP::Router      383/s            --           -88%         -100%         -100%
+Router::Simple   3199/s          734%             --          -97%          -99%
+Router::Boom   107789/s        28007%          3269%            --          -67%
+Router::R3     329098/s        85715%         10187%          205%            --
+ 
+Benchmarking 'first charactar matching' by path '/'
+===============================================================
+                    Rate  HTTP::Router Router::Simple Router::Boom    Router::R3
+HTTP::Router       179/s            --           -91%        -100%         -100%
+Router::Simple    2036/s         1035%             --         -99%         -100%
+Router::Boom    153597/s        85476%          7443%           --          -88%
+Router::R3     1310719/s       730158%         64266%         753%            --
