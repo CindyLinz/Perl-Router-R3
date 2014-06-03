@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 
-use lib qw(/home/cindy/perl5/lib/perl);
 use Data::Dumper;
 
 use Router::R3;
@@ -16,8 +15,12 @@ my $t = Router::R3->new(
     '/post/{id}' => 4,
     '/post2/{id:\d+}' => 5,
     '/post3/{idx:\d{3}}' => 6,
-    '/post4/{idx:\d{3}}/{idy}' => 7,
+    '/post4/{idx:\d{3}}/{idy:\d}' => 7,
 );
+#my $t = Router::R3->new(
+#    '/a/' => 6,
+#    '/a/{a}' => 7,
+#);
 my($a, $b) = $t->match('/post4/333/22');
 print "t=$t, a=$a, b=$b\n";
 if( $b ) {

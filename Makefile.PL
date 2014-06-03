@@ -3,33 +3,6 @@ use ExtUtils::MakeMaker;
 use strict;
 use warnings;
 
-our %build_reqs = (
-    # 'perl-ExtUtils-Depends'   => '0.300',
-    'perl-ExtUtils-PkgConfig' => '1.030',
-);
-
-our %PREREQ_PM = (
-    # 'ExtUtils::Depends'   => $build_reqs{'perl-ExtUtils-Depends'},
-    'ExtUtils::PkgConfig' => $build_reqs{'perl-ExtUtils-PkgConfig'},
-);
-
-sub try_module  {
-    my ($name, $required_version) = @_;
-    return eval "use $name '$required_version'; 1;";
-}
-
-# Writing a fake Makefile ensures that CPAN will pick up the correct
-# dependencies and install them.
-unless (eval "use ExtUtils::PkgConfig '$build_reqs{'perl-ExtUtils-PkgConfig'}'; 1") {
-    warn "$@\n";
-    WriteMakefile(
-        PREREQ_PM    => \%PREREQ_PM,
-        PRINT_PREREQ => 1,
-    );
-    exit 1; # not reached
-}
-
-
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
@@ -46,13 +19,17 @@ WriteMakefile(
     CONFIGURE => sub {
         my @CCFLAGS = qw(-O2 -std=c99);
         my @LIBS = qw();
-        my %pkg_info = ExtUtils::PkgConfig->find('libpcre');
-        die "libpcre is required." unless %pkg_info;
-        print "Found libpcre:\n";
-        print "modversion:  $pkg_info{modversion}\n";
-        print "cflags:      $pkg_info{cflags}\n";
-        print "libs:        $pkg_info{libs}\n";
-        push @LIBS, $pkg_info{libs};
+        if( exists &ExtUtils::PkgConfig::find ) {
+            my %pkg_info = ExtUtils::PkgConfig->find('libpcre');
+            die "libpcre is required." unless %pkg_info;
+            print "Found libpcre:\n";
+            print "modversion:  $pkg_info{modversion}\n";
+            print "cflags:      $pkg_info{cflags}\n";
+            print "libs:        $pkg_info{libs}\n";
+            push @LIBS, $pkg_info{libs};
+        } else {
+            push @LIBS, '-lpcre';
+        }
 
         my @INCLUDE_DIRS=qw(.);
         push @INCLUDE_DIRS, "/usr/local/include" if -e "/usr/local/include"; # check for homebrew path

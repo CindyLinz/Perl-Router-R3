@@ -27,19 +27,24 @@ $source_code =<<'END';
 #define HAVE_STRDUP
 END
 for(qw(
+    r3/3rdparty/zmalloc.h
     r3/include/r3_define.h
     r3/include/str_array.h
+    r3/include/match_entry.h
     r3/include/r3.h
     r3/include/r3_list.h
     r3/include/r3_str.h
-    r3/include/zmalloc.h
+    r3/src/slug.h
+    r3/3rdparty/zmalloc.c
+    r3/src/match_entry.c
     r3/src/edge.c
     r3/src/list.c
     r3/src/node.c
-    r3/src/zmalloc.c
     r3/src/str.c
     r3/src/token.c
+    r3/src/slug.c
 )) {
+    print "fetching file $_\n";
     $source_code .= "/******* $_ *******/\n";
     $source_code .= read_file($_);
 }

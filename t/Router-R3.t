@@ -51,4 +51,10 @@ test_all_match(Router::R3->new(@pattern));
 test_all_match(Router::R3->new(\@pattern));
 test_all_match(Router::R3->new({@pattern}));
 
+eval { my $a = Router::R3->new("/abc/{a:(", 1) };
+ok($@, "in-complete slug");
+
+eval { my $a = Router::R3->new("/abc/{a:(}", 1) };
+ok($@, "bad slug");
+
 done_testing();

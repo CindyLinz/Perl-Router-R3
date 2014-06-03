@@ -1,5 +1,9 @@
 Revision history for Perl extension Router::R3.
 
+0.10.0 2014.6.3
+    With r3 version 1.3.0
+    Better error handling (by Perl die)
+
 0.9.3 2014.5.23
     Change Makefile.PL for MacOS friendly (by c9s)
 
