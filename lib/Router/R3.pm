@@ -104,6 +104,33 @@ Or from GitHub:
 
 =back
 
+=head1 Benchmark
+
+    Benchmarking 'plain string matching' by path '/corge/quux/bar'
+    ===============================================================
+                    Rate  HTTP::Router Router::Simple  Router::Boom    Router::R3
+    HTTP::Router      372/s            --           -90%         -100%         -100%
+    Router::Simple   3588/s          864%             --          -98%          -99%
+    Router::Boom   152240/s        40814%          4143%            --          -76%
+    Router::R3     626710/s       168328%         17368%          312%            --
+
+    Benchmarking 'regexp string matching' by path '/post/2012/03'
+    ===============================================================
+                    Rate  HTTP::Router Router::Simple  Router::Boom    Router::R3
+    HTTP::Router     5986/s            --           -87%          -94%          -97%
+    Router::Simple  47553/s          694%             --          -50%          -76%
+    Router::Boom    94626/s         1481%            99%            --          -53%
+    Router::R3     200971/s         3257%           323%          112%            --
+
+    Benchmarking 'first charactar matching' by path '/'
+    ===============================================================
+                        Rate  HTTP::Router Router::Simple Router::Boom    Router::R3
+    HTTP::Router      2983/s            --           -87%         -98%         -100%
+    Router::Simple   23502/s          688%             --         -85%          -98%
+    Router::Boom    160116/s         5268%           581%           --          -90%
+    Router::R3     1531215/s        51231%          6415%         856%            --
+
+
 =head1 SEE ALSO
 
 The original C version L<"github repository"|https://github.com/c9s/r3> by L<c9s|https://metacpan.org/author/CORNELIUS>
