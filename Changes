@@ -1,5 +1,8 @@
 Revision history for Perl extension Router::R3.
 
+0.11.0 2014.8.12
+    To compatible with perl 5.8, 5.10, 5.12.. (and also previously 5.14, 5.16, 5.18)
+
 0.10.1 2014.6.3
     POD with benchmark (by c9s)
 

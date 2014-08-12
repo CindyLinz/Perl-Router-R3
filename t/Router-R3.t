@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 45;
 BEGIN { use_ok('Router::R3') };
 
 #########################
@@ -56,5 +56,3 @@ ok($@, "in-complete slug");
 
 eval { my $a = Router::R3->new("/abc/{a:(}", 1) };
 ok($@, "bad slug");
-
-done_testing();

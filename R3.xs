@@ -2558,9 +2558,11 @@ MODULE = Router::R3		PACKAGE = Router::R3
 INCLUDE: const-xs.inc
 
 #define croak_r3_errstr(prefix) { \
-    SV *err_sv = newSVpvf(prefix ": %s", errstr); \
+    STRLEN errlen = strlen(errstr); \
+    char *cloned_errstr = (char*) alloca(errlen+1); \
+    Copy(errstr, cloned_errstr, errlen+1, char); \
     free(errstr); \
-    croak_sv(err_sv); \
+    croak(prefix ": %s", cloned_errstr); \
 }
 
 #define ANALYZE_PATTERN(pattern, pattern_len) { \
