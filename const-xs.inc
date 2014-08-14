@@ -20,14 +20,12 @@ constant(sv)
            Second, if present, is found value */
         switch (type) {
         case PERL_constant_NOTFOUND:
-          sv =
-	    sv_2mortal(newSVpvf("%s is not a valid Router::R3 macro", s));
+          sv = sv_2mortal(newSVpvf("%s is not a valid Router::R3 macro", s));
           PUSHs(sv);
           break;
         case PERL_constant_NOTDEF:
           sv = sv_2mortal(newSVpvf(
-	    "Your vendor has not defined Router::R3 macro %s, used",
-				   s));
+	    "Your vendor has not defined Router::R3 macro %s, used", s));
           PUSHs(sv);
           break;
 	/* Uncomment this if you need to return IVs

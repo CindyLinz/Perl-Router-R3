@@ -8,7 +8,7 @@ use Carp;
 require Exporter;
 use AutoLoader;
 
-our $VERSION = '0.011000';
+our $VERSION = '0.011001';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
