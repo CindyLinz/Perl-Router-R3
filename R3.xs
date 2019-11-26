@@ -2895,6 +2895,7 @@ match(SV* r3_sv, SV *str_sv)
 void DESTROY(SV* r3_sv)
     PPCODE:
         void* pad = SvRV(SvRV(r3_sv));
+        if (!pad) return;
         int branch_n = *(int*)((char*)pad + sizeof(node*));
         SV** target = (SV**)((char*)pad + sizeof(node*) + sizeof(int));
         for(int i=0; i<branch_n; ++i)
